@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapelový spevník s akordami</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HLAVNÁ PLOCHA PRE TEXT A AKORDY (VĽAVO) -->
+        <main class="song-viewer" id="songViewer">
+            <div class="viewer-toolbar">
+                <button id="mobileToggleBtn" class="btn btn-primary mobile-only">☰ Zoznam piesní</button>
+                
+                <div class="zoom-controls">
+                    <span class="toolbar-label">Písmo:</span>
+                    <button id="fontMinusBtn" class="btn btn-icon" title="Zmenšiť písmo">A-</button>
+                    <button id="fontPlusBtn" class="btn btn-icon" title="Zväčšiť písmo">A+</button>
+                </div>
+
+                <div class="transpose-controls">
+                    <span class="toolbar-label">Posun:</span>
+                    <button id="transposeDownBtn" class="btn btn-icon" title="Znížiť o poltón">-1</button>
+                    <span id="transposeValue">0</span>
+                    <button id="transposeUpBtn" class="btn btn-icon" title="Zvýšiť o poltón">+1</button>
+                </div>
+
+                <button id="hideCapoBtn" class="btn btn-warning" style="display: none;" title="Skryje kapo a prepočíta akordy na znejúcu tóninu bez kapa">
+                    🎸 Skryť kapo
+                </button>
+
+                <div class="action-controls" id="songActions" style="display: none;">
+                    <button id="editSongBtn" class="btn btn-secondary">✏️ Upraviť</button>
+                    <button id="deleteSongBtn" class="btn btn-danger">🗑️ Zmazať</button>
+                </div>
+            </div>
+
+            <div id="bannerMessage" class="banner-message" style="display: none;"></div>
+
+            <div id="songContentArea" class="song-content-area">
+                <div class="empty-state">
+                    <h2>Vyber si pieseň zo zoznamu</h2>
+                    <p>Klikni na pieseň v pravom paneli alebo pridaj novú pre celú kapelu.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- ZOZNAM PIESNÍ A VYHĽADÁVANIE (NAPRAVO) -->
+        <aside class="song-sidebar" id="songSidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title-row">
+                    <h1>🎸 Spevník</h1>
+                    <button id="closeSidebarBtn" class="btn btn-icon mobile-only">✕</button>
+                </div>
+                <button id="addNewSongBtn" class="btn btn-success full-width">+ Pridať novú pieseň</button>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Hľadať názov, autora alebo text...">
+                </div>
+                <div class="sync-row">
+                    <span id="syncStatus" class="sync-status">Načítavam...</span>
+                    <button id="refreshCloudBtn" class="btn-link" title="Stiahnuť najnovšie zmeny z cloudu">🔄 Obnoviť</button>
+                </div>
+            </div>
+            
+            <ul id="songList" class="song-list">
+                <!-- Sem sa dynamicky načítajú piesne -->
+            </ul>
+        </aside>
+    </div>
+
+    <!-- MODÁLNE OKNO PRE PRIDANIE / ÚPRAVU PIESNE -->
+    <div id="editorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nová pieseň</h2>
+                <button id="closeModalBtn" class="btn btn-icon">✕</button>
+            </div>
+            <form id="songForm">
+                <input type="hidden" id="songId">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="songTitleInput">Názov piesne *</label>
+                        <input type="text" id="songTitleInput" required placeholder="Napr. Voda čo ma drží nad vodou">
+                    </div>
+                    <div class="form-group">
+                        <label for="songAuthorInput">Autor / Interpret</label>
+                        <input type="text" id="songAuthorInput" placeholder="Napr. Elán (nepovinné)">
+                    </div>
+                    <div class="form-group form-group-small">
+                        <label for="songCapoInput">Kapodaster</label>
+                        <input type="number" id="songCapoInput" min="0" max="12" value="0" title="0 = bez kapa, 4 = 4. pražec">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-help">
+                        <label for="songBodyInput">Text a akordy *</label>
+                        <button type="button" id="insertChordHelperBtn" class="btn btn-small">+ Vložiť akord ( )</button>
+                    </div>
+                    <p class="help-text">
+                        Akordy píš v zátvorkách presne pred slabikou alebo slovom, napr.: <code>(Cm7)Slovo1 slovo2 (G)slovo3</code>.
+                        Ak pieseň hráte s kapom (napr. 4), napíš akordy tak, ako ich chytá gitara s kapom.
+                    </p>
+                    <textarea id="songBodyInput" rows="12" required placeholder="(Am)Keď sa raz (F)ráno zobudíš
+(C)a zistíš, že (G)nie som tu..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" id="cancelModalBtn" class="btn btn-secondary">Zrušiť</button>
+                    <button type="submit" id="saveSongBtn" class="btn btn-success">💾 Uložiť pre kapelu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
