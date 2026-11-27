@@ -1,10 +1,4 @@
-/**
- * NASTAVENIE CLOUDU (GOOGLE APPS SCRIPT WEB APP URL)
- * Sem vlož URL adresu, ktorú získaš podľa návodu z Google Tabuľky.
- * Ak necháš prázdne "", aplikácia bude fungovať v lokálnom režime (localStorage).
- */
-const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbx8TN0fKA75X5jFnf6czSlwcaXmbF_dNe63aaJSmAYT9mwJzrmyCC61J3ejaeOXS2U7/exec"; 
-
+const CLOUD_API_URL = "";
 
 const DEFAULT_SONGS = [
     {
@@ -12,25 +6,54 @@ const DEFAULT_SONGS = [
         title: "Voda čo ma drží nad vodou",
         author: "Elán",
         capo: 2,
-        content: "(Am)Keby bolo (F)niečo, čo sa (C)nedá pove(G)dať,\n(Am)keby bolo (F)niečo, čo sa (C)nedá vrátiť (G)späť.\n(F)Tak by som ti (G)povedal, že (C)ľúbim ťa tak (Am)veľmi,\n(F)ako voda, (G)čo ma drží (Am)nad vodou."
+        content: "(Hmi)Keby bolo (G)niečo, čo sa (D)nedá pove(A)dať,\n(Hmi)keby bolo (G)niečo, čo sa (D)nedá vrátiť (A)späť.\n(G)Tak by som ti (A)povedal, že (D)ľúbim ťa tak (Hmi)veľmi,\n(G)ako voda, (A)čo ma drží (Hmi)nad vodou."
     },
     {
         id: "demo-2",
         title: "Tři kříže",
         author: "Hop Trop",
         capo: 0,
-        content: "(Dm)Dávám sbohem (C)břehům prokla(Am)tejm,\n(Dm)který v drápech (C)má ďábel (Dm)sám.\n(F)Bílou přídí (C)šalupa My (Am)May\n(Dm)míří k útesům, (C)který (Dm)znám.\n\nRef:\n(F)Jen tři kříže z (C)bílýho kame(Am)ní\n(Dm)někdo do písku (C)posklá(Dm)dal."
+        content: "(Dmi)Dávám sbohem (C)břehům prokla(Ami)tejm,\n(Dmi)který v drápech (C)má ďábel (Dmi)sám.\n(F)Bílou přídí (C)šalupa My (Ami)May\n(Dmi)míří k útesům, (C)který (Dmi)znám.\n\nRef:\n(F)Jen tři kříže z (C)bílýho kame(Ami)ní\n(Dmi)někdo do písku (C)posklá(Dmi)dal."
+    }
+];
+
+const DEFAULT_PLAYLISTS = [
+    {
+        id: "pl-koncert-1",
+        name: "Koncert – základ",
+        songIds: ["demo-1", "demo-2"]
     }
 ];
 
 let songs = [];
+let playlists = [];
+let activeSidebarTab = "songs"; // "songs" | "playlists"
+let currentPlaylistId = null;
 let filteredSongsCache = [];
 let lastDeletedSong = null;
 let currentSongId = null;
 let currentFontSize = parseInt(localStorage.getItem("spevnik_font_size"), 10) || 18;
 let transposeSteps = 0;
 let hideCapo = false;
+let isToolbarCollapsed = localStorage.getItem("spevnik_toolbar_collapsed") === "true";
+let chordNotation = localStorage.getItem("spevnik_notation") === "en" ? "en" : "sk";
 let isSaving = false;
+
+const viewerToolbarEl = document.getElementById("viewerToolbar");
+const toggleToolbarBtnEl = document.getElementById("toggleToolbarBtn");
+const notationToggleBtnEl = document.getElementById("notationToggleBtn");
+const playlistNavBarEl = document.getElementById("playlistNavBar");
+const playlistNavTitleEl = document.getElementById("playlistNavTitle");
+const playlistNavCounterEl = document.getElementById("playlistNavCounter");
+const prevSongBtnEl = document.getElementById("prevSongBtn");
+const nextSongBtnEl = document.getElementById("nextSongBtn");
+
+const tabAllSongsBtnEl = document.getElementById("tabAllSongsBtn");
+const tabPlaylistsBtnEl = document.getElementById("tabPlaylistsBtn");
+const allSongsControlsEl = document.getElementById("allSongsControls");
+const playlistsControlsEl = document.getElementById("playlistsControls");
+const playlistSelectEl = document.getElementById("playlistSelect");
+const activePlaylistActionsEl = document.getElementById("activePlaylistActions");
 
 const songListEl = document.getElementById("songList");
 const searchInputEl = document.getElementById("searchInput");
@@ -52,8 +75,13 @@ const songAuthorInput = document.getElementById("songAuthorInput");
 const songCapoInput = document.getElementById("songCapoInput");
 const songBodyInput = document.getElementById("songBodyInput");
 
+const addToPlaylistModalEl = document.getElementById("addToPlaylistModal");
+const pickSongSelectEl = document.getElementById("pickSongSelect");
+
 document.addEventListener("DOMContentLoaded", function () {
     applyFontSize();
+    applyToolbarCollapsed();
+    applyNotationButton();
     setupEventListeners();
     loadSongs();
 
@@ -61,6 +89,172 @@ document.addEventListener("DOMContentLoaded", function () {
         songSidebarEl.classList.add("open");
     }
 });
+
+// ==========================================
+// 1. OSOBNÉ NASTAVENIA (LOCALSTORAGE)
+// ==========================================
+
+function applyFontSize() {
+    document.documentElement.style.setProperty("--song-font-size", currentFontSize + "px");
+    localStorage.setItem("spevnik_font_size", String(currentFontSize));
+}
+
+function applyToolbarCollapsed() {
+    if (!viewerToolbarEl || !toggleToolbarBtnEl) return;
+    viewerToolbarEl.classList.toggle("collapsed", isToolbarCollapsed);
+    toggleToolbarBtnEl.textContent = isToolbarCollapsed ? "▼" : "▲";
+    toggleToolbarBtnEl.title = isToolbarCollapsed ? "Rozbaliť hornú lištu" : "Zbaliť hornú lištu";
+    localStorage.setItem("spevnik_toolbar_collapsed", String(isToolbarCollapsed));
+}
+
+function applyNotationButton() {
+    if (!notationToggleBtnEl) return;
+    if (chordNotation === "sk") {
+        notationToggleBtnEl.textContent = "SK (Hmi)";
+        notationToggleBtnEl.classList.remove("btn-primary");
+        notationToggleBtnEl.classList.add("btn-secondary");
+    } else {
+        notationToggleBtnEl.textContent = "EN (Bm)";
+        notationToggleBtnEl.classList.remove("btn-secondary");
+        notationToggleBtnEl.classList.add("btn-primary");
+    }
+    localStorage.setItem("spevnik_notation", chordNotation);
+}
+
+// ==========================================
+// 2. PLAYLISTY (CLOUD + LOCAL CACHE)
+// ==========================================
+
+function normalizePlaylist(raw) {
+    return {
+        id: String(raw.id),
+        name: String(raw.name || "Playlist").trim(),
+        songIds: Array.isArray(raw.songIds) ? raw.songIds.map(String) : []
+    };
+}
+
+function saveLocalCache() {
+    localStorage.setItem("spevnik_songs", JSON.stringify(songs));
+    localStorage.setItem("spevnik_playlists", JSON.stringify(playlists));
+}
+
+function loadLocalCache() {
+    const localSongs = localStorage.getItem("spevnik_songs");
+    if (localSongs) {
+        try {
+            const parsedSongs = JSON.parse(localSongs);
+            if (Array.isArray(parsedSongs)) {
+                songs = parsedSongs.map(normalizeSong);
+            }
+        } catch (e) {
+            songs = [];
+        }
+    }
+
+    const localPlaylists = localStorage.getItem("spevnik_playlists");
+    if (localPlaylists) {
+        try {
+            const parsedPlaylists = JSON.parse(localPlaylists);
+            if (Array.isArray(parsedPlaylists)) {
+                playlists = parsedPlaylists.map(normalizePlaylist);
+            }
+        } catch (e) {
+            playlists = [];
+        }
+    }
+}
+
+function cleanDeletedSongFromPlaylistsLocal(deletedSongId) {
+    playlists.forEach(function (pl) {
+        pl.songIds = pl.songIds.filter(function (id) { return id !== deletedSongId; });
+    });
+}
+
+function getCurrentPlaylist() {
+    if (!currentPlaylistId) return null;
+    return playlists.find(function (pl) { return pl.id === currentPlaylistId; }) || null;
+}
+
+function renderPlaylistSelect() {
+    if (!playlistSelectEl) return;
+    if (currentPlaylistId && !playlists.some(function (pl) { return pl.id === currentPlaylistId; })) {
+        currentPlaylistId = playlists.length > 0 ? playlists[0].id : null;
+    }
+
+    playlistSelectEl.innerHTML = '<option value="">-- Vyber playlist --</option>';
+
+    playlists.forEach(function (pl) {
+        const opt = document.createElement("option");
+        opt.value = pl.id;
+        opt.textContent = pl.name + " (" + pl.songIds.length + ")";
+        if (pl.id === currentPlaylistId) {
+            opt.selected = true;
+        }
+        playlistSelectEl.appendChild(opt);
+    });
+
+    const activePl = getCurrentPlaylist();
+    if (activePlaylistActionsEl) {
+        activePlaylistActionsEl.style.display = activePl ? "flex" : "none";
+    }
+}
+
+function updatePlaylistNavBar() {
+    const activePl = getCurrentPlaylist();
+    if (!playlistNavBarEl || activeSidebarTab !== "playlists" || !activePl || !currentSongId) {
+        if (playlistNavBarEl) playlistNavBarEl.style.display = "none";
+        return;
+    }
+
+    const idx = activePl.songIds.indexOf(currentSongId);
+    if (idx === -1) {
+        playlistNavBarEl.style.display = "none";
+        return;
+    }
+
+    playlistNavBarEl.style.display = "flex";
+    if (playlistNavTitleEl) playlistNavTitleEl.textContent = activePl.name;
+    if (playlistNavCounterEl) playlistNavCounterEl.textContent = (idx + 1) + " / " + activePl.songIds.length;
+    if (prevSongBtnEl) prevSongBtnEl.disabled = idx <= 0;
+    if (nextSongBtnEl) nextSongBtnEl.disabled = idx >= activePl.songIds.length - 1;
+}
+
+function goToPlaylistOffset(offset) {
+    const activePl = getCurrentPlaylist();
+    if (!activePl || !currentSongId) return;
+    const idx = activePl.songIds.indexOf(currentSongId);
+    const targetIdx = idx + offset;
+    if (targetIdx < 0 || targetIdx >= activePl.songIds.length) return;
+    const targetSongId = activePl.songIds[targetIdx];
+    openSongCleanly(targetSongId);
+    if (songContentAreaEl) {
+        songContentAreaEl.scrollTop = 0;
+    }
+}
+
+function setSidebarTab(tabName) {
+    activeSidebarTab = tabName;
+    const isSongs = tabName === "songs";
+
+    if (tabAllSongsBtnEl) tabAllSongsBtnEl.classList.toggle("active", isSongs);
+    if (tabPlaylistsBtnEl) tabPlaylistsBtnEl.classList.toggle("active", !isSongs);
+    if (allSongsControlsEl) allSongsControlsEl.style.display = isSongs ? "block" : "none";
+    if (playlistsControlsEl) playlistsControlsEl.style.display = isSongs ? "none" : "block";
+
+    if (!isSongs) {
+        if (!currentPlaylistId && playlists.length > 0) {
+            currentPlaylistId = playlists[0].id;
+        }
+        renderPlaylistSelect();
+    }
+
+    renderSongList();
+    updatePlaylistNavBar();
+}
+
+// ==========================================
+// 3. NAČÍTANIE A UKLADANIE DÁT (CLOUD + LOCAL)
+// ==========================================
 
 function normalizeSong(raw) {
     return {
@@ -97,65 +291,87 @@ function hideBanner() {
 }
 
 async function loadSongs() {
-    updateStatus("Načítavam piesne...");
+    updateStatus("Načítavam spevník a playlisty...");
+    loadLocalCache();
 
-    const localData = localStorage.getItem("spevnik_songs");
-    if (localData) {
-        try {
-            const parsed = JSON.parse(localData);
-            if (Array.isArray(parsed)) {
-                songs = parsed.map(normalizeSong);
-                renderSongList();
-            }
-        } catch (e) {
-            songs = DEFAULT_SONGS.map(normalizeSong);
-        }
+    if (songs.length > 0 || playlists.length > 0) {
+        renderPlaylistSelect();
+        renderSongList();
     }
 
     if (CLOUD_API_URL && CLOUD_API_URL.trim() !== "") {
         try {
-            const response = await fetch(CLOUD_API_URL.trim(), { cache: "no-store" });
+            const response = await fetch(CLOUD_API_URL.trim());
             if (!response.ok) {
                 throw new Error("HTTP chyba " + response.status);
             }
-            const cloudSongs = await response.json();
+            const payload = await response.json();
 
-            if (Array.isArray(cloudSongs)) {
-                songs = cloudSongs.map(normalizeSong);
-                localStorage.setItem("spevnik_songs", JSON.stringify(songs));
-                renderSongList();
-                if (currentSongId) {
-                    const stillExists = songs.some(function (s) { return s.id === currentSongId; });
-                    if (stillExists) {
-                        selectSong(currentSongId);
-                    } else {
-                        resetViewer();
-                    }
+            if (Array.isArray(payload)) {
+                songs = payload.map(normalizeSong);
+                if (!playlists.length) {
+                    playlists = DEFAULT_PLAYLISTS.map(normalizePlaylist);
                 }
-                updateStatus("☁️ Synchronizované");
+            } else if (payload && typeof payload === "object") {
+                if (Array.isArray(payload.songs)) {
+                    songs = payload.songs.map(normalizeSong);
+                }
+                if (Array.isArray(payload.playlists)) {
+                    playlists = payload.playlists.map(normalizePlaylist);
+                }
+            } else {
+                throw new Error("Neplatný formát dát z cloudu");
             }
+
+            saveLocalCache();
+            renderPlaylistSelect();
+            renderSongList();
+            updatePlaylistNavBar();
+
+            if (currentSongId) {
+                const stillExists = songs.some(function (s) { return s.id === currentSongId; });
+                if (stillExists) {
+                    selectSong(currentSongId);
+                } else {
+                    resetViewer();
+                }
+            }
+            updateStatus("☁️ Synchronizované");
         } catch (error) {
             console.error("Chyba pri načítaní z cloudu:", error);
             if (!songs.length) {
                 songs = DEFAULT_SONGS.map(normalizeSong);
             }
+            if (!playlists.length) {
+                playlists = DEFAULT_PLAYLISTS.map(normalizePlaylist);
+            }
+            saveLocalCache();
+            renderPlaylistSelect();
             renderSongList();
-            updateStatus("⚠️ Nepodarilo sa spojiť s cloudom");
-            showBanner("Cloud momentálne neodpovedá. Zobrazujú sa lokálne uložené piesne.", "warning");
+            updatePlaylistNavBar();
+            updateStatus("⚠️ Nepodarilo sa načítať z cloudu");
+            showBanner("Cloud momentálne neodpovedá. Zobrazujú sa lokálne uložené údaje.", "warning");
         }
     } else {
         if (!songs.length) {
             songs = DEFAULT_SONGS.map(normalizeSong);
-            localStorage.setItem("spevnik_songs", JSON.stringify(songs));
         }
+        if (!playlists.length) {
+            playlists = DEFAULT_PLAYLISTS.map(normalizePlaylist);
+        }
+        saveLocalCache();
+        renderPlaylistSelect();
         renderSongList();
+        updatePlaylistNavBar();
         updateStatus("💾 Lokálny režim");
     }
 }
 
-async function syncWithCloud(action, songData) {
-    localStorage.setItem("spevnik_songs", JSON.stringify(songs));
+async function postToCloud(bodyObj) {
+    saveLocalCache();
+    renderPlaylistSelect();
     renderSongList();
+    updatePlaylistNavBar();
 
     if (!CLOUD_API_URL || CLOUD_API_URL.trim() === "") {
         updateStatus("💾 Uložené v tomto prehliadači");
@@ -167,7 +383,7 @@ async function syncWithCloud(action, songData) {
         const response = await fetch(CLOUD_API_URL.trim(), {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: action, song: songData })
+            body: JSON.stringify(bodyObj)
         });
 
         if (!response.ok) {
@@ -198,6 +414,7 @@ function resetViewer() {
     currentSongId = null;
     if (songActionsEl) songActionsEl.style.display = "none";
     if (hideCapoBtnEl) hideCapoBtnEl.style.display = "none";
+    updatePlaylistNavBar();
     if (songContentAreaEl) {
         songContentAreaEl.innerHTML =
             '<div class="empty-state">' +
@@ -207,12 +424,23 @@ function resetViewer() {
     }
 }
 
+// ==========================================
+// 4. ZOZNAM PIESNÍ, PLAYLISTY A VYHĽADÁVANIE
+// ==========================================
+
 function normalizeText(str) {
     return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 function renderSongList() {
     if (!songListEl) return;
+    songListEl.innerHTML = "";
+
+    if (activeSidebarTab === "playlists") {
+        renderPlaylistItemsList();
+        return;
+    }
+
     const query = normalizeText(searchInputEl ? searchInputEl.value.trim() : "");
     const sortedSongs = songs.slice().sort(function (a, b) {
         return a.title.localeCompare(b.title, "sk");
@@ -227,8 +455,6 @@ function renderSongList() {
         );
     });
 
-    songListEl.innerHTML = "";
-
     if (filteredSongsCache.length === 0) {
         songListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: #64748b;">Žiadna pieseň sa nenašla.</li>';
         return;
@@ -240,14 +466,116 @@ function renderSongList() {
         const metaParts = [];
         if (song.author) metaParts.push(song.author);
         if (song.capo > 0) metaParts.push("Capo " + song.capo);
+
         li.innerHTML =
+            '<div class="song-item-main">' +
             '<div class="song-item-title">' + escapeHtml(song.title) + "</div>" +
-            '<div class="song-item-author">' + escapeHtml(metaParts.join(" • ") || "Bez autora") + "</div>";
+            '<div class="song-item-author">' + escapeHtml(metaParts.join(" • ") || "Bez autora") + "</div>" +
+            "</div>";
+
         li.addEventListener("click", function () {
             openSongCleanly(song.id);
         });
         songListEl.appendChild(li);
     });
+}
+
+function renderPlaylistItemsList() {
+    const activePl = getCurrentPlaylist();
+    if (!activePl) {
+        songListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: #64748b;">Vytvor alebo vyber playlist vyššie.</li>';
+        return;
+    }
+
+    if (!activePl.songIds.length) {
+        songListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: #64748b;">Tento playlist je zatiaľ prázdny. Klikni na „+ Pridať pieseň“.</li>';
+        return;
+    }
+
+    activePl.songIds.forEach(function (songId, index) {
+        const song = songs.find(function (s) { return s.id === songId; });
+        if (!song) return;
+
+        const li = document.createElement("li");
+        li.className = "song-item" + (song.id === currentSongId ? " active" : "");
+
+        const metaParts = [(index + 1) + "."];
+        if (song.author) metaParts.push(song.author);
+        if (song.capo > 0) metaParts.push("Capo " + song.capo);
+
+        const mainDiv = document.createElement("div");
+        mainDiv.className = "song-item-main";
+        mainDiv.innerHTML =
+            '<div class="song-item-title">' + escapeHtml(song.title) + "</div>" +
+            '<div class="song-item-author">' + escapeHtml(metaParts.join(" • ")) + "</div>";
+        mainDiv.addEventListener("click", function () {
+            openSongCleanly(song.id);
+        });
+
+        const controlsDiv = document.createElement("div");
+        controlsDiv.className = "playlist-order-controls";
+
+        const upBtn = document.createElement("button");
+        upBtn.type = "button";
+        upBtn.className = "btn-mini";
+        upBtn.textContent = "↑";
+        upBtn.title = "Posunúť vyššie v playliste";
+        upBtn.disabled = index === 0;
+        upBtn.addEventListener("click", async function (e) {
+            e.stopPropagation();
+            await movePlaylistSong(index, -1);
+        });
+
+        const downBtn = document.createElement("button");
+        downBtn.type = "button";
+        downBtn.className = "btn-mini";
+        downBtn.textContent = "↓";
+        downBtn.title = "Posunúť nižšie v playliste";
+        downBtn.disabled = index === activePl.songIds.length - 1;
+        downBtn.addEventListener("click", async function (e) {
+            e.stopPropagation();
+            await movePlaylistSong(index, 1);
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "btn-mini btn-mini-danger";
+        removeBtn.textContent = "✕";
+        removeBtn.title = "Odobrať z playlistu";
+        removeBtn.addEventListener("click", async function (e) {
+            e.stopPropagation();
+            await removePlaylistSong(index);
+        });
+
+        controlsDiv.appendChild(upBtn);
+        controlsDiv.appendChild(downBtn);
+        controlsDiv.appendChild(removeBtn);
+
+        li.appendChild(mainDiv);
+        li.appendChild(controlsDiv);
+        songListEl.appendChild(li);
+    });
+}
+
+async function movePlaylistSong(index, delta) {
+    const activePl = getCurrentPlaylist();
+    if (!activePl) return;
+    const targetIndex = index + delta;
+    if (targetIndex < 0 || targetIndex >= activePl.songIds.length) return;
+
+    const temp = activePl.songIds[index];
+    activePl.songIds[index] = activePl.songIds[targetIndex];
+    activePl.songIds[targetIndex] = temp;
+
+    await postToCloud({ action: "update_playlist", playlist: activePl });
+}
+
+async function removePlaylistSong(index) {
+    const activePl = getCurrentPlaylist();
+    if (!activePl) return;
+    activePl.songIds.splice(index, 1);
+
+    await postToCloud({ action: "update_playlist", playlist: activePl });
 }
 
 function openSongCleanly(songId) {
@@ -260,6 +588,10 @@ function openSongCleanly(songId) {
         songSidebarEl.classList.remove("open");
     }
 }
+
+// ==========================================
+// 5. PARSOVANIE, KAPO, TRANSPOZÍCIA A SLOVENSKÉ/ANGLICKÉ AKORDY
+// ==========================================
 
 function updateHideCapoButton(songCapo) {
     if (!hideCapoBtnEl) return;
@@ -279,11 +611,12 @@ function selectSong(id) {
 
     currentSongId = id;
     renderSongList();
+    updatePlaylistNavBar();
     if (songActionsEl) songActionsEl.style.display = "flex";
     updateHideCapoButton(song.capo);
 
     const effectiveSemitones = transposeSteps + (hideCapo ? song.capo : 0);
-    const parsedHtml = parseLyricsWithChords(song.content, effectiveSemitones);
+    const parsedHtml = parseLyricsWithChords(song.content, effectiveSemitones, chordNotation);
 
     let capoBadgeHtml = "";
     if (song.capo > 0 && !hideCapo) {
@@ -302,7 +635,7 @@ function selectSong(id) {
         '<div class="lyrics-container" id="lyricsContainer">' + parsedHtml + "</div>";
 }
 
-function parseLyricsWithChords(text, transpose) {
+function parseLyricsWithChords(text, transpose, notation) {
     const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
 
     return lines.map(function (line) {
@@ -323,7 +656,7 @@ function parseLyricsWithChords(text, transpose) {
                     lineHtml += createSegmentHtml(pendingChord, " ");
                 }
                 const rawChord = part.slice(1, -1).trim();
-                pendingChord = transposeChord(rawChord, transpose);
+                pendingChord = formatAndTransposeChord(rawChord, transpose, notation);
             } else {
                 lineHtml += createSegmentHtml(pendingChord, part);
                 pendingChord = "";
@@ -342,29 +675,55 @@ function createSegmentHtml(chord, text) {
     return '<span class="chord-segment"><span class="chord">' + escapeHtml(chord) + '</span><span class="lyric-text">' + escapeHtml(text) + "</span></span>";
 }
 
-const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const NOTES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const SK_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "B", "H"];
+const EN_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "Bb", "B"];
 
-function transposeChord(chord, steps) {
-    if (steps === 0 || !chord) return chord;
+function noteToSemitoneIndex(noteToken, notation) {
+    switch (noteToken) {
+        case "C": return 0;
+        case "C#":
+        case "Db": return 1;
+        case "D": return 2;
+        case "D#":
+        case "Eb": return 3;
+        case "E":
+        case "Fb": return 4;
+        case "E#":
+        case "F": return 5;
+        case "F#":
+        case "Gb": return 6;
+        case "G": return 7;
+        case "G#":
+        case "Ab": return 8;
+        case "A": return 9;
+        case "A#":
+        case "Bb":
+        case "B":
+            if (noteToken === "B" && notation === "en") return 11;
+            return 10;
+        case "H": return 11;
+        default: return -1;
+    }
+}
 
-    return chord.replace(/(^|\/)([A-H][#b]?)/g, function (match, prefix, noteRaw) {
-        let note = noteRaw;
-        const isEuropeanH = note === "H";
-        if (isEuropeanH) note = "B";
+function formatAndTransposeChord(chord, steps, notation) {
+    if (!chord) return "";
+    const scale = notation === "en" ? EN_NOTES : SK_NOTES;
 
-        let index = NOTES_SHARP.indexOf(note);
-        if (index === -1) index = NOTES_FLAT.indexOf(note);
-        if (index === -1) return match;
+    return chord.replace(/(^|\/)(C#|Db|D#|Eb|F#|Gb|G#|Ab|A#|Bb|[A-HC])(?=(?:mi|maj|dim|aug|sus|add|m|[0-9/+-]|$))/g, function (match, prefix, rootToken) {
+        const baseIdx = noteToSemitoneIndex(rootToken, notation);
+        if (baseIdx === -1) return match;
 
-        let newIndex = (index + steps) % 12;
-        if (newIndex < 0) newIndex += 12;
+        let newIdx = (baseIdx + (steps || 0)) % 12;
+        if (newIdx < 0) newIdx += 12;
 
-        let transposed = NOTES_SHARP[newIndex];
-        if (isEuropeanH && transposed === "B") transposed = "H";
-        return prefix + transposed;
+        return prefix + scale[newIdx];
     });
 }
+
+// ==========================================
+// 6. PRIDÁVANIE, ÚPRAVA A MAZANIE PIESNÍ
+// ==========================================
 
 function openEditorModal(song) {
     isSaving = false;
@@ -422,7 +781,7 @@ async function handleSaveSong(e) {
                 songs[index] = { id: id, title: title, author: author, capo: capo, content: content };
                 closeEditorModal();
                 selectSong(id);
-                const ok = await syncWithCloud("update", songs[index]);
+                const ok = await postToCloud({ action: "update_song", song: songs[index] });
                 if (ok) showBanner('Pieseň "' + title + '" bola uložená pre celú kapelu.', "info");
             }
         } else {
@@ -436,7 +795,7 @@ async function handleSaveSong(e) {
             songs.push(newSong);
             closeEditorModal();
             selectSong(newSong.id);
-            const ok = await syncWithCloud("create", newSong);
+            const ok = await postToCloud({ action: "create_song", song: newSong });
             if (ok) showBanner('Nová pieseň "' + title + '" bola pridaná pre celú kapelu.', "info");
         }
     } finally {
@@ -457,8 +816,9 @@ async function handleDeleteSong() {
         lastDeletedSong = Object.assign({}, song);
         const deletedId = currentSongId;
         songs = songs.filter(function (s) { return s.id !== deletedId; });
+        cleanDeletedSongFromPlaylistsLocal(deletedId);
         resetViewer();
-        await syncWithCloud("delete", { id: deletedId });
+        await postToCloud({ action: "delete_song", song: { id: deletedId } });
 
         showBanner('Pieseň "' + lastDeletedSong.title + '" bola zmazaná.', "info", async function () {
             if (!lastDeletedSong) return;
@@ -466,22 +826,178 @@ async function handleDeleteSong() {
             lastDeletedSong = null;
             songs.push(restored);
             selectSong(restored.id);
-            await syncWithCloud("create", restored);
+            await postToCloud({ action: "create_song", song: restored });
             showBanner('Pieseň "' + restored.title + '" bola obnovená.', "info");
         });
     }
 }
 
-function applyFontSize() {
-    document.documentElement.style.setProperty("--song-font-size", currentFontSize + "px");
-    localStorage.setItem("spevnik_font_size", String(currentFontSize));
+// ==========================================
+// 7. SPRÁVA PLAYLISTOV V CLOUDE (HÁROK PLAYLISTS)
+// ==========================================
+
+async function createNewPlaylist() {
+    const name = prompt("Zadaj názov nového playlistu pre kapelu (napr. Koncert – piatok):");
+    if (!name || !name.trim()) return;
+
+    const newPl = {
+        id: "pl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5),
+        name: name.trim(),
+        songIds: []
+    };
+    playlists.push(newPl);
+    currentPlaylistId = newPl.id;
+
+    const ok = await postToCloud({ action: "create_playlist", playlist: newPl });
+    if (ok) showBanner('Playlist "' + newPl.name + '" bol vytvorený pre celú kapelu.', "info");
 }
 
+async function renameCurrentPlaylist() {
+    const activePl = getCurrentPlaylist();
+    if (!activePl) return;
+
+    const nextName = prompt("Nový názov playlistu:", activePl.name);
+    if (!nextName || !nextName.trim()) return;
+
+    activePl.name = nextName.trim();
+    const ok = await postToCloud({ action: "update_playlist", playlist: activePl });
+    if (ok) showBanner('Playlist bol premenovaný na "' + activePl.name + '".', "info");
+}
+
+async function deleteCurrentPlaylist() {
+    const activePl = getCurrentPlaylist();
+    if (!activePl) return;
+
+    if (!confirm('Naozaj chceš zmazať playlist "' + activePl.name + '" pre celú kapelu?')) return;
+
+    const deletedId = activePl.id;
+    const deletedName = activePl.name;
+    playlists = playlists.filter(function (pl) { return pl.id !== deletedId; });
+    currentPlaylistId = playlists.length > 0 ? playlists[0].id : null;
+
+    const ok = await postToCloud({ action: "delete_playlist", playlist: { id: deletedId } });
+    if (ok) showBanner('Playlist "' + deletedName + '" bol zmazaný.', "info");
+}
+
+function openAddToPlaylistModal() {
+    const activePl = getCurrentPlaylist();
+    if (!activePl || !pickSongSelectEl || !addToPlaylistModalEl) return;
+
+    const sorted = songs.slice().sort(function (a, b) {
+        return a.title.localeCompare(b.title, "sk");
+    });
+
+    pickSongSelectEl.innerHTML = "";
+    sorted.forEach(function (song) {
+        const opt = document.createElement("option");
+        opt.value = song.id;
+        opt.textContent = song.title + (song.author ? " – " + song.author : "");
+        pickSongSelectEl.appendChild(opt);
+    });
+
+    addToPlaylistModalEl.classList.add("open");
+}
+
+function closeAddToPlaylistModal() {
+    if (addToPlaylistModalEl) {
+        addToPlaylistModalEl.classList.remove("open");
+    }
+}
+
+async function confirmAddSongToPlaylist() {
+    const activePl = getCurrentPlaylist();
+    if (!activePl || !pickSongSelectEl) return;
+
+    const selectedSongId = pickSongSelectEl.value;
+    if (!selectedSongId) return;
+
+    activePl.songIds.push(selectedSongId);
+    closeAddToPlaylistModal();
+
+    const ok = await postToCloud({ action: "update_playlist", playlist: activePl });
+    if (ok) showBanner('Pieseň bola pridaná do playlistu "' + activePl.name + '".', "info");
+}
+
+// ==========================================
+// 8. OVLÁDACIE PRVKY A EVENTY
+// ==========================================
+
 function setupEventListeners() {
+    if (toggleToolbarBtnEl) {
+        toggleToolbarBtnEl.addEventListener("click", function () {
+            isToolbarCollapsed = !isToolbarCollapsed;
+            applyToolbarCollapsed();
+        });
+    }
+
+    if (notationToggleBtnEl) {
+        notationToggleBtnEl.addEventListener("click", function () {
+            chordNotation = chordNotation === "sk" ? "en" : "sk";
+            applyNotationButton();
+            if (currentSongId) {
+                selectSong(currentSongId);
+            }
+        });
+    }
+
+    if (prevSongBtnEl) {
+        prevSongBtnEl.addEventListener("click", function () {
+            goToPlaylistOffset(-1);
+        });
+    }
+
+    if (nextSongBtnEl) {
+        nextSongBtnEl.addEventListener("click", function () {
+            goToPlaylistOffset(1);
+        });
+    }
+
+    if (tabAllSongsBtnEl) {
+        tabAllSongsBtnEl.addEventListener("click", function () {
+            setSidebarTab("songs");
+        });
+    }
+
+    if (tabPlaylistsBtnEl) {
+        tabPlaylistsBtnEl.addEventListener("click", function () {
+            setSidebarTab("playlists");
+        });
+    }
+
+    if (playlistSelectEl) {
+        playlistSelectEl.addEventListener("change", function () {
+            currentPlaylistId = playlistSelectEl.value || null;
+            renderPlaylistSelect();
+            renderSongList();
+            updatePlaylistNavBar();
+        });
+    }
+
+    const newPlaylistBtn = document.getElementById("newPlaylistBtn");
+    if (newPlaylistBtn) newPlaylistBtn.addEventListener("click", createNewPlaylist);
+
+    const renamePlaylistBtn = document.getElementById("renamePlaylistBtn");
+    if (renamePlaylistBtn) renamePlaylistBtn.addEventListener("click", renameCurrentPlaylist);
+
+    const deletePlaylistBtn = document.getElementById("deletePlaylistBtn");
+    if (deletePlaylistBtn) deletePlaylistBtn.addEventListener("click", deleteCurrentPlaylist);
+
+    const addSongToPlaylistBtn = document.getElementById("addSongToPlaylistBtn");
+    if (addSongToPlaylistBtn) addSongToPlaylistBtn.addEventListener("click", openAddToPlaylistModal);
+
+    const closeAddToPlaylistModalBtn = document.getElementById("closeAddToPlaylistModalBtn");
+    if (closeAddToPlaylistModalBtn) closeAddToPlaylistModalBtn.addEventListener("click", closeAddToPlaylistModal);
+
+    const cancelAddToPlaylistBtn = document.getElementById("cancelAddToPlaylistBtn");
+    if (cancelAddToPlaylistBtn) cancelAddToPlaylistBtn.addEventListener("click", closeAddToPlaylistModal);
+
+    const confirmAddSongToPlaylistBtn = document.getElementById("confirmAddSongToPlaylistBtn");
+    if (confirmAddSongToPlaylistBtn) confirmAddSongToPlaylistBtn.addEventListener("click", confirmAddSongToPlaylist);
+
     if (searchInputEl) {
         searchInputEl.addEventListener("input", renderSongList);
         searchInputEl.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" && filteredSongsCache.length === 1) {
+            if (e.key === "Enter" && activeSidebarTab === "songs" && filteredSongsCache.length === 1) {
                 openSongCleanly(filteredSongsCache[0].id);
             }
         });
@@ -606,9 +1122,9 @@ function setupEventListeners() {
 function escapeHtml(unsafe) {
     if (!unsafe) return "";
     return String(unsafe)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/&/g, "&")
+        .replace(/</g, "<")
+        .replace(/>/g, ">")
+        .replace(/"/g, """)
+        .replace(/'/g, "'");
 }
