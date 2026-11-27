@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
@@ -10,30 +10,52 @@
     <div class="app-container">
         <!-- HLAVNÁ PLOCHA PRE TEXT A AKORDY (VĽAVO) -->
         <main class="song-viewer" id="songViewer">
-            <div class="viewer-toolbar">
-                <button id="mobileToggleBtn" class="btn btn-primary mobile-only">☰ Zoznam piesní</button>
-                
-                <div class="zoom-controls">
-                    <span class="toolbar-label">Písmo:</span>
-                    <button id="fontMinusBtn" class="btn btn-icon" title="Zmenšiť písmo">A-</button>
-                    <button id="fontPlusBtn" class="btn btn-icon" title="Zväčšiť písmo">A+</button>
-                </div>
+            <div class="viewer-toolbar" id="viewerToolbar">
+                <div class="toolbar-main-row">
+                    <button id="mobileToggleBtn" class="btn btn-primary mobile-only">☰ Zoznam / Playlisty</button>
+                    <button id="toggleToolbarBtn" class="btn btn-icon" title="Zbaliť alebo rozbaliť hornú lištu">▲</button>
 
-                <div class="transpose-controls">
-                    <span class="toolbar-label">Posun:</span>
-                    <button id="transposeDownBtn" class="btn btn-icon" title="Znížiť o poltón">-1</button>
-                    <span id="transposeValue">0</span>
-                    <button id="transposeUpBtn" class="btn btn-icon" title="Zvýšiť o poltón">+1</button>
-                </div>
+                    <div class="toolbar-collapsible" id="toolbarCollapsible">
+                        <div class="zoom-controls">
+                            <span class="toolbar-label">Písmo:</span>
+                            <button id="fontMinusBtn" class="btn btn-icon" title="Zmenšiť písmo">A-</button>
+                            <button id="fontPlusBtn" class="btn btn-icon" title="Zväčšiť písmo">A+</button>
+                        </div>
 
-                <button id="hideCapoBtn" class="btn btn-warning" style="display: none;" title="Skryje kapo a prepočíta akordy na znejúcu tóninu bez kapa">
-                    🎸 Skryť kapo
-                </button>
+                        <div class="transpose-controls">
+                            <span class="toolbar-label">Posun:</span>
+                            <button id="transposeDownBtn" class="btn btn-icon" title="Znížiť o poltón">-1</button>
+                            <span id="transposeValue">0</span>
+                            <button id="transposeUpBtn" class="btn btn-icon" title="Zvýšiť o poltón">+1</button>
+                        </div>
 
-                <div class="action-controls" id="songActions" style="display: none;">
-                    <button id="editSongBtn" class="btn btn-secondary">✏️ Upraviť</button>
-                    <button id="deleteSongBtn" class="btn btn-danger">🗑️ Zmazať</button>
+                        <div class="notation-controls">
+                            <span class="toolbar-label">Akordy:</span>
+                            <button id="notationToggleBtn" class="btn btn-secondary" title="Prepína slovenské (H, Hmi) a anglické (B, Bm) označovanie akordov">
+                                SK (Hmi)
+                            </button>
+                        </div>
+
+                        <button id="hideCapoBtn" class="btn btn-warning" style="display: none;" title="Skryje kapo a prepočíta akordy na znejúcu tóninu bez kapa">
+                            🎸 Skryť kapo
+                        </button>
+
+                        <div class="action-controls" id="songActions" style="display: none;">
+                            <button id="editSongBtn" class="btn btn-secondary">✏️ Upraviť</button>
+                            <button id="deleteSongBtn" class="btn btn-danger">🗑️ Zmazať</button>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- KONCERTOVÁ NAVIGÁCIA PLAYLISTU (VIDITEĽNÁ AJ KEĎ JE HORNÁ LIŠTA ZBALENÁ) -->
+            <div id="playlistNavBar" class="playlist-nav-bar" style="display: none;">
+                <button id="prevSongBtn" class="btn btn-primary">← Späť</button>
+                <div class="playlist-nav-info">
+                    <span id="playlistNavTitle" class="playlist-nav-title">Playlist</span>
+                    <span id="playlistNavCounter" class="playlist-nav-counter">0 / 0</span>
+                </div>
+                <button id="nextSongBtn" class="btn btn-primary">Ďalej →</button>
             </div>
 
             <div id="bannerMessage" class="banner-message" style="display: none;"></div>
@@ -41,22 +63,49 @@
             <div id="songContentArea" class="song-content-area">
                 <div class="empty-state">
                     <h2>Vyber si pieseň zo zoznamu</h2>
-                    <p>Klikni na pieseň v pravom paneli alebo pridaj novú pre celú kapelu.</p>
+                    <p>Klikni na pieseň v pravom paneli, prepni na playlisty alebo pridaj novú pieseň.</p>
                 </div>
             </div>
         </main>
 
-        <!-- ZOZNAM PIESNÍ A VYHĽADÁVANIE (NAPRAVO) -->
+        <!-- PRAVÝ PANEL: ZOZNAM PIESNÍ / PLAYLISTY -->
         <aside class="song-sidebar" id="songSidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title-row">
                     <h1>🎸 Spevník</h1>
                     <button id="closeSidebarBtn" class="btn btn-icon mobile-only">✕</button>
                 </div>
-                <button id="addNewSongBtn" class="btn btn-success full-width">+ Pridať novú pieseň</button>
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="Hľadať názov, autora alebo text...">
+
+                <!-- PREPÍNANIE MEDZI VŠETKÝMI PIESŇAMI A PLAYLISTMI -->
+                <div class="mode-tabs">
+                    <button id="tabAllSongsBtn" class="tab-btn active">Všetky piesne</button>
+                    <button id="tabPlaylistsBtn" class="tab-btn">Playlisty</button>
                 </div>
+
+                <!-- SEKCIA PRE VŠETKY PIESNE -->
+                <div id="allSongsControls">
+                    <button id="addNewSongBtn" class="btn btn-success full-width">+ Pridať novú pieseň</button>
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Hľadať názov, autora alebo text...">
+                    </div>
+                </div>
+
+                <!-- SEKCIA PRE PLAYLISTY -->
+                <div id="playlistsControls" style="display: none;">
+                    <div class="playlist-select-row">
+                        <select id="playlistSelect" class="playlist-select" title="Vyber playlist">
+                            <option value="">-- Vyber playlist --</option>
+                        </select>
+                        <button id="newPlaylistBtn" class="btn btn-success" title="Vytvoriť nový playlist">+ Nový</button>
+                    </div>
+
+                    <div id="activePlaylistActions" class="playlist-actions-row" style="display: none;">
+                        <button id="renamePlaylistBtn" class="btn btn-secondary btn-compact">✏️ Premenovať</button>
+                        <button id="addSongToPlaylistBtn" class="btn btn-primary btn-compact">+ Pridať pieseň</button>
+                        <button id="deletePlaylistBtn" class="btn btn-danger btn-compact">🗑️ Zmazať</button>
+                    </div>
+                </div>
+
                 <div class="sync-row">
                     <span id="syncStatus" class="sync-status">Načítavam...</span>
                     <button id="refreshCloudBtn" class="btn-link" title="Stiahnuť najnovšie zmeny z cloudu">🔄 Obnoviť</button>
@@ -64,7 +113,7 @@
             </div>
             
             <ul id="songList" class="song-list">
-                <!-- Sem sa dynamicky načítajú piesne -->
+                <!-- Sem sa dynamicky načítajú piesne alebo položky playlistu -->
             </ul>
         </aside>
     </div>
@@ -115,6 +164,24 @@
         </div>
     </div>
 
-    <script src="app.js?aa"></script>
+    <!-- MODÁLNE OKNO PRE PRIDANIE PIESNE DO PLAYLISTU -->
+    <div id="addToPlaylistModal" class="modal">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h2>Pridať pieseň do playlistu</h2>
+                <button id="closeAddToPlaylistModalBtn" class="btn btn-icon">✕</button>
+            </div>
+            <div class="form-group">
+                <label for="pickSongSelect">Vyber pieseň zo spevníka</label>
+                <select id="pickSongSelect" class="playlist-select full-width"></select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelAddToPlaylistBtn" class="btn btn-secondary">Zavrieť</button>
+                <button type="button" id="confirmAddSongToPlaylistBtn" class="btn btn-success">+ Pridať na koniec</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
