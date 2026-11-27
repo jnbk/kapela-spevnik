@@ -476,12 +476,28 @@ function renderPlaylistItemsList() {
         return;
     }
 
+    let draggedIndex = null;
+
+    function clearDragClasses() {
+        const items = songListEl.querySelectorAll(".song-item");
+        items.forEach(function (item) {
+            item.classList.remove("dragging", "drag-over-top", "drag-over-bottom");
+        });
+    }
+
     activePl.songIds.forEach(function (songId, index) {
         const song = songs.find(function (s) { return s.id === songId; });
         if (!song) return;
 
         const li = document.createElement("li");
-        li.className = "song-item" + (song.id === currentSongId ? " active" : "");
+        li.className = "song-item playlist-draggable" + (song.id === currentSongId ? " active" : "");
+        li.draggable = true;
+        li.dataset.index = String(index);
+
+        const handleSpan = document.createElement("span");
+        handleSpan.className = "drag-handle";
+        handleSpan.textContent = "⋮⋮";
+        handleSpan.title = "Potiahnutím zmeň poradie v playliste";
 
         const metaParts = [(index + 1) + "."];
         if (song.author) metaParts.push(song.author);
@@ -494,6 +510,61 @@ function renderPlaylistItemsList() {
             '<div class="song-item-author">' + escapeHtml(metaParts.join(" • ")) + "</div>";
         mainDiv.addEventListener("click", function () {
             openSongCleanly(song.id);
+        });
+
+        li.addEventListener("dragstart", function (e) {
+            draggedIndex = index;
+            li.classList.add("dragging");
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(index));
+            }
+        });
+
+        li.addEventListener("dragover", function (e) {
+            e.preventDefault();
+            if (e.dataTransfer) {
+                e.dataTransfer.dropEffect = "move";
+            }
+            const rect = li.getBoundingClientRect();
+            const isTopHalf = e.clientY < rect.top + rect.height / 2;
+            li.classList.toggle("drag-over-top", isTopHalf);
+            li.classList.toggle("drag-over-bottom", !isTopHalf);
+        });
+
+        li.addEventListener("dragleave", function () {
+            li.classList.remove("drag-over-top", "drag-over-bottom");
+        });
+
+        li.addEventListener("drop", async function (e) {
+            e.preventDefault();
+            const fromRaw = e.dataTransfer ? e.dataTransfer.getData("text/plain") : "";
+            const fromIndex = draggedIndex !== null ? draggedIndex : parseInt(fromRaw, 10);
+            const rect = li.getBoundingClientRect();
+            const insertAfter = e.clientY >= rect.top + rect.height / 2;
+
+            clearDragClasses();
+            draggedIndex = null;
+
+            if (isNaN(fromIndex) || fromIndex < 0 || fromIndex >= activePl.songIds.length) return;
+
+            let targetIndex = insertAfter ? index + 1 : index;
+            if (fromIndex < targetIndex) {
+                targetIndex -= 1;
+            }
+            if (targetIndex < 0) targetIndex = 0;
+            if (targetIndex >= activePl.songIds.length) targetIndex = activePl.songIds.length - 1;
+            if (fromIndex === targetIndex) return;
+
+            const movedItem = activePl.songIds.splice(fromIndex, 1)[0];
+            activePl.songIds.splice(targetIndex, 0, movedItem);
+
+            await postToCloud({ action: "update_playlist", playlist: activePl });
+        });
+
+        li.addEventListener("dragend", function () {
+            draggedIndex = null;
+            clearDragClasses();
         });
 
         const controlsDiv = document.createElement("div");
@@ -535,6 +606,7 @@ function renderPlaylistItemsList() {
         controlsDiv.appendChild(downBtn);
         controlsDiv.appendChild(removeBtn);
 
+        li.appendChild(handleSpan);
         li.appendChild(mainDiv);
         li.appendChild(controlsDiv);
         songListEl.appendChild(li);
