@@ -1,4 +1,4 @@
-const CLOUD_API_URL = "";
+const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbx8TN0fKA75X5jFnf6czSlwcaXmbF_dNe63aaJSmAYT9mwJzrmyCC61J3ejaeOXS2U7/exec";
 
 const DEFAULT_SONGS = [
     {
