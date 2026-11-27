@@ -3,7 +3,7 @@
  * Sem vlož URL adresu, ktorú získaš podľa návodu z Google Tabuľky.
  * Ak necháš prázdne "", aplikácia bude fungovať v lokálnom režime (localStorage).
  */
-const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbx8TN0fKA75X5jFnf6czSlwcaXmbF_dNe63aaJSmAYT9mwJzrmyCC61J3ejaeOXS2U7/exec"; 
+const CLOUD_API_URL = "[https://script.google.com/macros/s/AKfycbx8TN0fKA75X5jFnf6czSlwcaXmbF_dNe63aaJSmAYT9mwJzrmyCC61J3ejaeOXS2U7/exec](https://script.google.com/macros/s/AKfycbx8TN0fKA75X5jFnf6czSlwcaXmbF_dNe63aaJSmAYT9mwJzrmyCC61J3ejaeOXS2U7/exec)"; 
 
 
 const DEFAULT_SONGS = [
