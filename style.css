@@ -156,7 +156,7 @@ body {
 .song-content-area {
     flex: 1;
     padding: 25px 35px;
-    overflow-y: auto;
+    overflow: auto;
     line-height: 1.6;
 }
 
@@ -213,19 +213,24 @@ body {
     font-weight: 600;
 }
 
-/* RENDEROVANIE TEXTU A AKORDOV */
+/* RENDEROVANIE TEXTU A AKORDOV - BEZ LAMANIA RIADKOV */
 .lyrics-container {
     font-size: var(--song-font-size);
     user-select: text;
     padding-bottom: 80px;
+    padding-right: 24px;
+    display: inline-block;
+    min-width: 100%;
 }
 
 .lyric-line {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
     margin-bottom: 0.55em;
     min-height: 1.4em;
+    width: max-content;
+    min-width: 100%;
 }
 
 .lyric-line.empty-line {
@@ -237,6 +242,7 @@ body {
     flex-direction: column;
     justify-content: flex-end;
     vertical-align: bottom;
+    flex-shrink: 0;
 }
 
 .chord {
@@ -250,7 +256,7 @@ body {
 }
 
 .lyric-text {
-    white-space: pre-wrap;
+    white-space: pre;
     line-height: 1.35;
 }
 
@@ -384,7 +390,7 @@ body {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: background-color 0.15s, border-color 0.15s;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -398,6 +404,36 @@ body {
 .song-item.active {
     background-color: #dbeafe;
     border-left: 4px solid var(--primary);
+}
+
+.song-item.playlist-draggable {
+    cursor: grab;
+}
+
+.song-item.playlist-draggable:active {
+    cursor: grabbing;
+}
+
+.song-item.dragging {
+    opacity: 0.45;
+    background-color: #eff6ff;
+}
+
+.song-item.drag-over-top {
+    border-top: 3px solid var(--primary);
+}
+
+.song-item.drag-over-bottom {
+    border-bottom: 3px solid var(--primary);
+}
+
+.drag-handle {
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 4px 2px;
+    user-select: none;
+    flex-shrink: 0;
 }
 
 .song-item-main {
@@ -660,6 +696,7 @@ body {
 
     .song-content-area {
         padding: 16px;
+        overflow: auto;
     }
 
     .song-title {
